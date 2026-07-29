@@ -58,26 +58,36 @@ if [[ "$USE_ASCII" == "1" ]]; then
   SEP=" | "
 elif [[ "$USE_NERDFONT" == "1" ]]; then
   S_BRAND="◆"
-  S_BRANCH=" "
+  S_BRANCH=" "
   S_WARN=" 󰀦"
   S_PROMPT="❯"
   S_TIME="󰔟 "
   S_COST=" "
   if [[ "$USE_POWERLINE" == "1" ]]; then
-    SEP="  "
+    SEP="  "
   else
     SEP=" │ "
   fi
 else
   S_BRAND="◆"
-  S_BRANCH="⎇"
   S_WARN=" ⚠"
   S_PROMPT="❯"
   S_TIME=""
   S_COST=""
   if [[ "$USE_POWERLINE" == "1" ]]; then
-    SEP="  "
+    # U+E0A0 is a Powerline glyph, so it is available whenever Powerline
+    # separators are. It is monospace, so it occupies exactly one cell.
+    S_BRANCH=" "
+    SEP="  "
   else
+    # U+2387 is absent from common monospace fonts (Hack, Noto Sans Mono,
+    # DejaVu Sans Mono), so fontconfig falls back to a PROPORTIONAL face such
+    # as DejaVu Sans. Its East_Asian_Width is Neutral, so the terminal reserves
+    # a single cell, but the proportional glyph is drawn wider than that and
+    # bleeds into the next cell -- which held the first letter of the branch
+    # name, because this was the only tier without a trailing space. The space
+    # absorbs the overflow.
+    S_BRANCH="⎇ "
     SEP=" │ "
   fi
 fi
