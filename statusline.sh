@@ -91,6 +91,19 @@ fallback_prompt() {
   exit 0
 }
 
+# An unexpected failure must never leave the status line blank, because empty
+# output makes Claude Code render nothing at all.
+trap 'fallback_prompt "─"' ERR
+
+# Integer part of a value. Anything non-numeric (null, scientific notation,
+# stray command output) becomes 0, so it can never blow up an arithmetic
+# context and abort the script under `set -u`.
+to_int() { # $1=raw value  $2=target variable name
+  local v="${1%%.*}"
+  [[ "$v" =~ ^-?[0-9]+$ ]] || v=0
+  printf -v "$2" '%s' "$v"
+}
+
 command -v jq &>/dev/null || fallback_prompt "─ │ jq not found"
 
 # ═══════════════════════════════════════════════════════════════
@@ -145,8 +158,7 @@ model="${model_name:-─}"
 # 上下文進度條
 # ═══════════════════════════════════════════════════════════════
 
-pct_int=${ctx_pct%.*}
-pct_int=${pct_int:-0}
+to_int "${ctx_pct:-0}" pct_int
 if (( pct_int < 0 )); then pct_int=0; fi
 if (( pct_int > 100 )); then pct_int=100; fi
 
@@ -196,7 +208,7 @@ ctx_warn=""
 if (( pct_int >= 90 )); then ctx_warn="${RED}${S_WARN}${RST}"; fi
 
 # 上下文視窗大小（僅在 model display_name 不包含 context 資訊時才顯示）
-ctx_size_int=${ctx_size:-0}
+to_int "${ctx_size:-0}" ctx_size_int
 ctx_label=""
 if [[ "$model" != *context* && "$model" != *Context* ]]; then
   if (( ctx_size_int >= 1000000 )); then ctx_label=" ${GRAY}1M${RST}"
@@ -210,8 +222,7 @@ fi
 
 cost_val="${cost:-0}"
 cost_fmt=$(printf '%.2f' "$cost_val" 2>/dev/null || echo "0.00")
-cost_int=${cost_val%.*}
-cost_int=${cost_int:-0}
+to_int "$cost_val" cost_int
 
 if (( cost_int >= 10 )); then cost_color="$RED"
 elif (( cost_int >= 5 )); then cost_color="$YELLOW"
@@ -222,7 +233,7 @@ else cost_color="$YELLOW"; fi
 # 經過時間（零值智慧隱藏）
 # ═══════════════════════════════════════════════════════════════
 
-dur_ms=${duration_ms:-0}
+to_int "${duration_ms:-0}" dur_ms
 dur_section=""
 if (( dur_ms > 0 )); then
   dur_sec=$((dur_ms / 1000))
@@ -245,9 +256,19 @@ git_branch="${branch:-}"
 dirty=""
 
 git_cache_is_stale() {
-  [[ ! -f "$GIT_CACHE" ]] && return 0
-  local cache_age=$(( $(date +%s) - $(stat -f %m "$GIT_CACHE" 2>/dev/null || echo 0) ))
-  (( cache_age > GIT_CACHE_MAX_AGE ))
+  [[ -f "$GIT_CACHE" ]] || return 0
+  local mtime now
+  # mtime: GNU coreutils spells it -c %Y, BSD/macOS spells it -f %m.
+  # On Linux `stat -f` reports *filesystem* status and treats %m as a file
+  # name, so it printed noise on stdout ('  File: "..."'). That noise reached
+  # the arithmetic expansion and `set -u` aborted the whole script with
+  # "File: unbound variable" -- the status line went blank on every render
+  # after the first one, since the guard above returns early only while the
+  # cache file is still missing.
+  mtime=$(stat -c %Y "$GIT_CACHE" 2>/dev/null || stat -f %m "$GIT_CACHE" 2>/dev/null || echo 0)
+  to_int "$mtime" mtime
+  now=$(date +%s)
+  (( now - mtime > GIT_CACHE_MAX_AGE ))
 }
 
 if [[ -n "${cwd_full:-}" && -d "${cwd_full:-}" ]]; then
@@ -282,8 +303,8 @@ fi
 # 行數增減（零值智慧隱藏）
 # ═══════════════════════════════════════════════════════════════
 
-lines_add=${lines_add:-0}
-lines_rm=${lines_rm:-0}
+to_int "${lines_add:-0}" lines_add
+to_int "${lines_rm:-0}" lines_rm
 lines_section=""
 if (( lines_add > 0 || lines_rm > 0 )); then
   lines_section="${GREEN}+${lines_add}${RST}/${RED}-${lines_rm}${RST}"
@@ -294,8 +315,8 @@ fi
 # ═══════════════════════════════════════════════════════════════
 
 rate_section=""
-rate5h_int=${rate5h%.*}; rate5h_int=${rate5h_int:-0}
-rate7d_int=${rate7d%.*}; rate7d_int=${rate7d_int:-0}
+to_int "${rate5h:--1}" rate5h_int
+to_int "${rate7d:--1}" rate7d_int
 
 rate_parts=""
 if (( rate5h_int >= 0 )); then
