@@ -41,8 +41,7 @@ if [[ -f "$SETTINGS" ]]; then
     echo ""
     echo '  "statusLine": {'
     echo '    "type": "command",'
-    echo '    "command": "~/.claude/statusline.sh",'
-    echo '    "timeout": 10'
+    echo '    "command": "~/.claude/statusline.sh"'
     echo '  }'
     echo ""
   else
@@ -51,8 +50,7 @@ if [[ -f "$SETTINGS" ]]; then
     echo ""
     echo '  "statusLine": {'
     echo '    "type": "command",'
-    echo '    "command": "~/.claude/statusline.sh",'
-    echo '    "timeout": 10'
+    echo '    "command": "~/.claude/statusline.sh"'
     echo '  }'
     echo ""
   fi
@@ -63,8 +61,7 @@ else
   echo '{'
   echo '  "statusLine": {'
   echo '    "type": "command",'
-  echo '    "command": "~/.claude/statusline.sh",'
-  echo '    "timeout": 10'
+  echo '    "command": "~/.claude/statusline.sh"'
   echo '  }'
   echo '}'
   echo ""

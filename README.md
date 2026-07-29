@@ -76,8 +76,7 @@ Add this to your `settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh",
-    "timeout": 10
+    "command": "~/.claude/statusline.sh"
   }
 }
 ```

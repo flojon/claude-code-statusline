@@ -74,8 +74,7 @@ chmod +x ~/.claude/statusline.sh
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh",
-    "timeout": 10
+    "command": "~/.claude/statusline.sh"
   }
 }
 ```
