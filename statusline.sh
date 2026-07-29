@@ -249,8 +249,15 @@ fi
 # Git 分支與髒標記（帶快取）
 # ═══════════════════════════════════════════════════════════════
 
-GIT_CACHE="/tmp/claude-statusline-git-cache"
 GIT_CACHE_MAX_AGE=5
+
+# One cache file per user and per directory. A single shared path meant that
+# concurrent sessions in different projects overwrote each other's entry and
+# displayed the wrong branch, and on a multi-user host the first user to create
+# /tmp/claude-statusline-git-cache made the write fail for everybody else.
+GIT_CACHE_DIR="${TMPDIR:-/tmp}/claude-statusline-${UID:-0}"
+mkdir -p "$GIT_CACHE_DIR" 2>/dev/null || true
+GIT_CACHE="$GIT_CACHE_DIR/git-$(cksum <<< "${cwd_full:-.}" | cut -d' ' -f1)"
 
 git_branch="${branch:-}"
 dirty=""
@@ -286,14 +293,14 @@ if [[ -n "${cwd_full:-}" && -d "${cwd_full:-}" ]]; then
          ! git -C "$cwd_full" -c core.useBuiltinFSMonitor=false diff --cached --quiet 2>/dev/null; then
         cached_dirty="*"
       fi
-      echo "${cached_branch}|${cached_dirty}" > "$GIT_CACHE"
+      echo "${cached_branch}|${cached_dirty}" > "$GIT_CACHE" 2>/dev/null || true
     else
-      echo "|" > "$GIT_CACHE"
+      echo "|" > "$GIT_CACHE" 2>/dev/null || true
     fi
   fi
 
   if [[ -f "$GIT_CACHE" ]]; then
-    IFS='|' read -r cached_br cached_dt < "$GIT_CACHE"
+    IFS='|' read -r cached_br cached_dt < "$GIT_CACHE" || true
     if [[ -z "$git_branch" ]]; then git_branch="${cached_br}"; fi
     dirty="${cached_dt}"
   fi
