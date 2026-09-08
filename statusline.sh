@@ -64,7 +64,7 @@ elif [[ "$USE_NERDFONT" == "1" ]]; then
   S_PROMPT="❯"
   S_TIME="󰔟 "
   S_COST=""
-  S_RESET="↻"
+  S_RESET=" "
   if [[ "$USE_POWERLINE" == "1" ]]; then
     SEP="  "
   else
