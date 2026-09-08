@@ -64,7 +64,7 @@ elif [[ "$USE_NERDFONT" == "1" ]]; then
   S_PROMPT="❯"
   S_TIME="󰔟 "
   S_COST=""
-  S_RESET=" "
+  S_RESET=" "
   if [[ "$USE_POWERLINE" == "1" ]]; then
     SEP="  "
   else
@@ -103,6 +103,11 @@ sanitize() {
   local v="${!1}"
   printf -v "$1" '%s' "${v//[$'\x01'-$'\x1f'$'\x7f']/}"
 }
+
+# Nerd Font patches are not uniform: some builds are missing individual
+# glyphs from a set they otherwise carry. Override without editing:
+#   CLAUDE_STATUSLINE_RESET_GLYPH=$'\ue0b0'
+S_RESET="${CLAUDE_STATUSLINE_RESET_GLYPH:-$S_RESET}"
 
 # ═══════════════════════════════════════════════════════════════
 # 降級輸出
