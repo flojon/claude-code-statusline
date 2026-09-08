@@ -55,6 +55,7 @@ if [[ "$USE_ASCII" == "1" ]]; then
   S_PROMPT=">"
   S_TIME=""
   S_COST=""
+  S_RESET="@"
   SEP=" | "
 elif [[ "$USE_NERDFONT" == "1" ]]; then
   S_BRAND="◆"
@@ -63,6 +64,7 @@ elif [[ "$USE_NERDFONT" == "1" ]]; then
   S_PROMPT="❯"
   S_TIME="󰔟 "
   S_COST=" "
+  S_RESET="󰑐"
   if [[ "$USE_POWERLINE" == "1" ]]; then
     SEP="  "
   else
@@ -74,6 +76,7 @@ else
   S_PROMPT="❯"
   S_TIME=""
   S_COST=""
+  S_RESET="↻"
   if [[ "$USE_POWERLINE" == "1" ]]; then
     # U+E0A0 is a Powerline glyph, so it is available whenever Powerline
     # separators are. It is monospace, so it occupies exactly one cell.
@@ -146,6 +149,8 @@ parsed=$(echo "$input" | jq -r '
   (.cost.total_duration_ms // 0 | tostring),
   (.context_window.context_window_size // 0 | tostring),
   (.worktree.name // ""),
+  (.rate_limits.five_hour.resets_at // ""),
+  (.rate_limits.seven_day.resets_at // ""),
   "END"
 ' 2>/dev/null) || fallback_prompt "─ │ parse error"
 
@@ -164,10 +169,12 @@ parsed=$(echo "$input" | jq -r '
   IFS= read -r duration_ms
   IFS= read -r ctx_size
   IFS= read -r wt_name
+  IFS= read -r rate5h_reset
+  IFS= read -r rate7d_reset
   IFS= read -r _sentinel
 } <<< "$parsed"
 
-for _f in model_name dir branch agent_name cwd_full wt_name; do sanitize "$_f"; done
+for _f in model_name dir branch agent_name cwd_full wt_name rate5h_reset rate7d_reset; do sanitize "$_f"; done
 
 # ═══════════════════════════════════════════════════════════════
 # 模型
@@ -178,6 +185,51 @@ model="${model_name:-─}"
 # ═══════════════════════════════════════════════════════════════
 # 上下文進度條
 # ═══════════════════════════════════════════════════════════════
+
+# ISO 8601 (or a bare epoch) -> epoch seconds; empty string when unparseable.
+# GNU date first, then BSD, so one script covers Linux and macOS -- the same
+# shape as the stat fallback below. These three always return 0: an ERR trap
+# is armed, so a non-zero return would replace the status line with a dash.
+reset_epoch() {
+  local v="${1:-}" e=""
+  if [[ -z "$v" || "$v" == "null" ]]; then printf ''; return 0; fi
+  if [[ "$v" =~ ^[0-9]+$ ]]; then printf '%s' "$v"; return 0; fi
+  e=$(date -d "$v" +%s 2>/dev/null) || e=""
+  if [[ -z "$e" ]]; then
+    local t="${v%%.*}"; t="${t%Z}"
+    e=$(date -u -jf "%Y-%m-%dT%H:%M:%S" "$t" +%s 2>/dev/null) || e=""
+  fi
+  printf '%s' "$e"
+  return 0
+}
+
+# Local clock time (15:42). Absolute, not relative, because renders are
+# event-driven: a countdown sits stale on screen while the session is idle.
+reset_clock() {
+  local e out=""
+  e=$(reset_epoch "${1:-}")
+  if [[ -n "$e" ]]; then
+    out=$(date -d "@$e" +%H:%M 2>/dev/null) || out=""
+    if [[ -z "$out" ]]; then out=$(date -r "$e" +%H:%M 2>/dev/null) || out=""; fi
+  fi
+  printf '%s' "$out"
+  return 0
+}
+
+# Coarse time remaining (3d / 19h / 45m), for the 7d window where a clock
+# time would need a weekday to mean anything. Past resets clamp to 0m.
+reset_countdown() {
+  local e now diff
+  e=$(reset_epoch "${1:-}")
+  if [[ -z "$e" ]]; then printf ''; return 0; fi
+  now=$(date +%s)
+  diff=$(( e - now ))
+  if (( diff < 0 )); then diff=0; fi
+  if   (( diff >= 86400 )); then printf '%dd' $(( diff / 86400 ))
+  elif (( diff >= 3600  )); then printf '%dh' $(( diff / 3600  ))
+  else                           printf '%dm' $(( diff / 60    )); fi
+  return 0
+}
 
 to_int "${ctx_pct:-0}" pct_int
 if (( pct_int < 0 )); then pct_int=0; fi
@@ -347,15 +399,26 @@ rate_section=""
 to_int "${rate5h:--1}" rate5h_int
 to_int "${rate7d:--1}" rate7d_int
 
+rate5h_reset_fmt=$(reset_clock "${rate5h_reset:-}")
+rate7d_reset_fmt=$(reset_countdown "${rate7d_reset:-}")
+
 rate_parts=""
 if (( rate5h_int >= 0 )); then
   if (( rate5h_int >= 80 )); then rate_parts+="${RED}5h:${rate5h_int}%${RST}"
   else rate_parts+="${GRAY}5h:${rate5h_int}%${RST}"; fi
+  if [[ -n "$rate5h_reset_fmt" ]]; then
+    rate_parts+=" ${GRAY}${S_RESET}${rate5h_reset_fmt}${RST}"
+  fi
 fi
 if (( rate7d_int >= 0 )); then
-  if [[ -n "$rate_parts" ]]; then rate_parts+=" "; fi
+  if [[ -n "$rate_parts" ]]; then
+    if [[ -n "$rate5h_reset_fmt" ]]; then rate_parts+="  "; else rate_parts+=" "; fi
+  fi
   if (( rate7d_int >= 80 )); then rate_parts+="${RED}7d:${rate7d_int}%${RST}"
   else rate_parts+="${GRAY}7d:${rate7d_int}%${RST}"; fi
+  if [[ -n "$rate7d_reset_fmt" ]]; then
+    rate_parts+=" ${GRAY}${S_RESET}${rate7d_reset_fmt}${RST}"
+  fi
 fi
 if [[ -n "$rate_parts" ]]; then
   rate_section="${SEP}${rate_parts}"
