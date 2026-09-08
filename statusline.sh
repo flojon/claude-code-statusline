@@ -56,19 +56,19 @@ if [[ "$USE_ASCII" == "1" ]]; then
   S_TIME=""
   S_COST=""
   S_RESET="@"
-  SEP=" | "
+  SEP="   |   "
 elif [[ "$USE_NERDFONT" == "1" ]]; then
   S_BRAND="◆"
   S_BRANCH=" "
   S_WARN=" 󰀦"
   S_PROMPT="❯"
   S_TIME="󰔟 "
-  S_COST=" "
-  S_RESET="󰑐"
+  S_COST=""
+  S_RESET="↻"
   if [[ "$USE_POWERLINE" == "1" ]]; then
     SEP="  "
   else
-    SEP=" │ "
+    SEP="   ·   "
   fi
 else
   S_BRAND="◆"
@@ -91,7 +91,7 @@ else
     # name, because this was the only tier without a trailing space. The space
     # absorbs the overflow.
     S_BRANCH="⎇ "
-    SEP=" │ "
+    SEP="   ·   "
   fi
 fi
 
