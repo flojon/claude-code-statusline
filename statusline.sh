@@ -30,21 +30,21 @@ fi
 # 色彩與符號
 # ═══════════════════════════════════════════════════════════════
 
-RST='\033[0m'
-CYAN='\033[36m'
-BLUE='\033[34m'
-GRAY='\033[90m'
-DIM='\033[2m'
-YELLOW='\033[33m'
-GREEN='\033[32m'
-RED='\033[31m'
-MAGENTA='\033[35m'
-
+CSI=$'\033['
+RST=$'\033[0m'
+CYAN=$'\033[36m'
+BLUE=$'\033[34m'
+GRAY=$'\033[90m'
+DIM=$'\033[2m'
+YELLOW=$'\033[33m'
+GREEN=$'\033[32m'
+RED=$'\033[31m'
+MAGENTA=$'\033[35m'
 # Anthropic 品牌紫 (#7266EA)
 if (( USE_TRUECOLOR )); then
-  PURPLE='\033[38;2;114;102;234m'
+  PURPLE=$'\033[38;2;114;102;234m'
 else
-  PURPLE='\033[35m'
+  PURPLE=$'\033[35m'
 fi
 
 # 符號集
@@ -82,12 +82,21 @@ else
   fi
 fi
 
+# Strip C0 control characters and DEL from values that reach the terminal.
+# A directory name may legally contain a raw ESC, which would otherwise be
+# emitted verbatim and run as a terminal control sequence. The range stops at
+# \x7f on purpose: 0x80-0x9f are UTF-8 continuation bytes, not C1 controls.
+sanitize() {
+  local v="${!1}"
+  printf -v "$1" '%s' "${v//[$'\x01'-$'\x1f'$'\x7f']/}"
+}
+
 # ═══════════════════════════════════════════════════════════════
 # 降級輸出
 # ═══════════════════════════════════════════════════════════════
 
 fallback_prompt() {
-  printf '%b' "${GRAY}${1:-─}${RST}"
+  printf '%s' "${GRAY}${1:-─}${RST}"
   exit 0
 }
 
@@ -135,6 +144,8 @@ parsed=$(echo "$input" | jq -r '
   IFS= read -r _sentinel
 } <<< "$parsed"
 
+for _f in model_name dir branch agent_name cwd_full wt_name; do sanitize "$_f"; done
+
 # ═══════════════════════════════════════════════════════════════
 # 模型
 # ═══════════════════════════════════════════════════════════════
@@ -168,9 +179,9 @@ elif (( USE_TRUECOLOR )); then
   # 真彩色漸層：每格獨立上色
   for (( i=0; i<10; i++ )); do
     if (( i < bar_filled )); then
-      bar+="\\033[38;2;${GRAD_R[$i]};${GRAD_G[$i]};${GRAD_B[$i]}m█"
+      bar+="${CSI}38;2;${GRAD_R[$i]};${GRAD_G[$i]};${GRAD_B[$i]}m█"
     else
-      bar+="\\033[38;2;60;60;60m░"
+      bar+="${CSI}38;2;60;60;60m░"
     fi
   done
   bar+="${RST}"
@@ -273,6 +284,7 @@ if [[ -n "${cwd_full:-}" && -d "${cwd_full:-}" ]]; then
 
   if [[ -f "$GIT_CACHE" ]]; then
     IFS='|' read -r cached_br cached_dt < "$GIT_CACHE"
+    sanitize cached_br
     if [[ -z "$git_branch" ]]; then git_branch="${cached_br}"; fi
     dirty="${cached_dt}"
   fi
@@ -362,4 +374,5 @@ done
 # ═══════════════════════════════════════════════════════════════
 
 # 只輸出兩行（Claude Code 有自己的輸入提示符，不需要我們的 ❯）
-printf '%b\n%b' "$line1" "$line2"
+printf '%s
+%s' "$line1" "$line2"
